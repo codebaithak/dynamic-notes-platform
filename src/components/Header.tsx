@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, BookOpen } from "lucide-react";
+import { Menu, X, BookOpen, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Header = () => {
@@ -29,7 +29,13 @@ const Header = () => {
           <Link to="/subjects" className="text-sm font-medium transition-colors hover:text-primary">
             Subjects
           </Link>
-          <Button size="sm">Sign In</Button>
+          <Link to="/admin" className="text-sm font-medium transition-colors hover:text-primary">
+            Admin
+          </Link>
+          <Button size="sm">
+            <User className="h-4 w-4 mr-2" />
+            Sign In
+          </Button>
         </nav>
 
         {/* Mobile Menu Button */}
@@ -60,7 +66,17 @@ const Header = () => {
                 >
                   Subjects
                 </Link>
-                <Button size="sm" className="w-full">Sign In</Button>
+                <Link 
+                  to="/admin" 
+                  className="text-sm font-medium transition-colors hover:text-primary"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Admin
+                </Link>
+                <Button size="sm" className="w-full">
+                  <User className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
               </nav>
             </div>
           </div>
