@@ -1,31 +1,61 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, BookOpen, List } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { subjects, lessons } from "@/lib/mock-data";
-import { Subject, Lesson } from "@/types";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSubjectById, getLessonsBySubjectId } from "@/api";
+import { useToast } from "@/components/ui/use-toast";
 
 const SubjectDetailPage = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [subjectLessons, setSubjectLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  
+  // Fetch subject details
+  const { 
+    data: subject, 
+    isLoading: isLoadingSubject, 
+    error: subjectError 
+  } = useQuery({
+    queryKey: ['subject', subjectId],
+    queryFn: () => getSubjectById(subjectId || ''),
+    enabled: !!subjectId,
+    onError: (err) => {
+      console.error("Error fetching subject:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load subject details. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  });
 
-  useEffect(() => {
-    // In a real app, this would be a database query
-    const foundSubject = subjects.find(s => s.id === subjectId);
-    const foundLessons = lessons[subjectId || ""] || [];
-    
-    setSubject(foundSubject || null);
-    setSubjectLessons(foundLessons);
-    setLoading(false);
-  }, [subjectId]);
+  // Fetch lessons for this subject
+  const { 
+    data: lessons = [], 
+    isLoading: isLoadingLessons, 
+    error: lessonsError 
+  } = useQuery({
+    queryKey: ['lessons', subjectId],
+    queryFn: () => getLessonsBySubjectId(subjectId || ''),
+    enabled: !!subjectId,
+    onError: (err) => {
+      console.error("Error fetching lessons:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load lessons. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  });
 
-  if (loading) {
+  const isLoading = isLoadingSubject || isLoadingLessons;
+  const error = subjectError || lessonsError;
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -36,7 +66,7 @@ const SubjectDetailPage = () => {
     );
   }
 
-  if (!subject) {
+  if (error || !subject) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -84,18 +114,18 @@ const SubjectDetailPage = () => {
                 <div className="mt-8">
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <List className="h-5 w-5" />
-                    Lessons ({subjectLessons.length})
+                    Lessons ({lessons.length})
                   </h2>
                   
-                  {subjectLessons.length > 0 ? (
+                  {lessons.length > 0 ? (
                     <div className="space-y-3">
-                      {subjectLessons.map((lesson) => (
+                      {lessons.map((lesson) => (
                         <Card key={lesson.id} className="transition-all hover:shadow-md">
                           <CardHeader className="p-4">
                             <CardTitle className="text-lg flex justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-normal text-muted-foreground">
-                                  {lesson.order}.
+                                  {lesson.lesson_order}.
                                 </span>
                                 {lesson.title}
                               </div>

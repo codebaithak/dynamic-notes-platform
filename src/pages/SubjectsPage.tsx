@@ -1,15 +1,32 @@
 
 import { useState } from "react";
 import { Search, Filter } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import SubjectCard from "@/components/SubjectCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { subjects } from "@/lib/mock-data";
+import { getSubjects } from "@/api";
+import { useToast } from "@/components/ui/use-toast";
 
 const SubjectsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
   
+  const { data: subjects = [], isLoading, error } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: getSubjects,
+    onError: (err) => {
+      console.error("Error fetching subjects:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load subjects. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Filter subjects based on search term
   const filteredSubjects = subjects.filter(subject => 
     subject.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     subject.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -43,10 +60,28 @@ const SubjectsPage = () => {
             </Button>
           </div>
 
-          {filteredSubjects.length > 0 ? (
+          {isLoading ? (
+            <div className="mt-16 flex flex-col items-center justify-center text-center">
+              <p className="text-lg font-medium">Loading subjects...</p>
+            </div>
+          ) : error ? (
+            <div className="mt-16 flex flex-col items-center justify-center text-center">
+              <p className="text-lg font-medium">Failed to load subjects</p>
+              <p className="text-sm text-muted-foreground">
+                Please try refreshing the page
+              </p>
+            </div>
+          ) : filteredSubjects.length > 0 ? (
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredSubjects.map((subject) => (
-                <SubjectCard key={subject.id} subject={subject} />
+                <SubjectCard key={subject.id} subject={{
+                  id: subject.id,
+                  title: subject.title,
+                  description: subject.description,
+                  image: subject.image || '/placeholder.svg',
+                  lessonsCount: subject.lessonsCount,
+                  progress: subject.progress
+                }} />
               ))}
             </div>
           ) : (
