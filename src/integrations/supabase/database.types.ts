@@ -1,5 +1,5 @@
 
-import { Database } from './types';
+import { Database as SupabaseGeneratedTypes } from './types';
 
 // Define database table types based on our schema
 export type Profile = {
@@ -56,58 +56,57 @@ export type SubjectWithProgress = Subject & {
   lessonsCount: number;
 };
 
-// Extend Database type for Supabase
-export type Tables = Database['public']['Tables'];
-
-declare global {
-  type Database = {
-    public: {
-      Tables: {
-        profiles: {
-          Row: Profile;
-          Insert: Omit<Profile, 'id' | 'created_at'>;
-          Update: Partial<Omit<Profile, 'id'>>;
-        };
-        subjects: {
-          Row: Subject;
-          Insert: Omit<Subject, 'id' | 'created_at' | 'updated_at'>;
-          Update: Partial<Omit<Subject, 'id' | 'created_at' | 'updated_at'>>;
-        };
-        lessons: {
-          Row: Lesson;
-          Insert: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>;
-          Update: Partial<Omit<Lesson, 'id' | 'created_at' | 'updated_at'>>;
-        };
-        comments: {
-          Row: Comment;
-          Insert: Omit<Comment, 'id' | 'created_at' | 'user'>;
-          Update: Partial<Omit<Comment, 'id' | 'created_at' | 'user'>>;
-        };
-        user_progress: {
-          Row: UserProgress;
-          Insert: Omit<UserProgress, 'id' | 'created_at'>;
-          Update: Partial<Omit<UserProgress, 'id' | 'created_at'>>;
-        };
+// Define the Database type with our tables
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: Profile;
+        Insert: Omit<Profile, 'id' | 'created_at'>;
+        Update: Partial<Omit<Profile, 'id'>>;
       };
-      Views: {
-        [key: string]: {
-          Row: Record<string, unknown>;
-          Insert: Record<string, unknown>;
-          Update: Record<string, unknown>;
-        };
+      subjects: {
+        Row: Subject;
+        Insert: Omit<Subject, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Subject, 'id' | 'created_at' | 'updated_at'>>;
       };
-      Functions: {
-        get_subject_progress: {
-          Args: { subject_id: string; current_user_id: string };
-          Returns: number;
-        };
+      lessons: {
+        Row: Lesson;
+        Insert: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Lesson, 'id' | 'created_at' | 'updated_at'>>;
       };
-      Enums: {
-        [key: string]: never;
+      comments: {
+        Row: Comment;
+        Insert: Omit<Comment, 'id' | 'created_at' | 'user'>;
+        Update: Partial<Omit<Comment, 'id' | 'created_at' | 'user'>>;
       };
-      CompositeTypes: {
-        [key: string]: never;
+      user_progress: {
+        Row: UserProgress;
+        Insert: Omit<UserProgress, 'id' | 'created_at'>;
+        Update: Partial<Omit<UserProgress, 'id' | 'created_at'>>;
       };
     };
+    Views: {
+      [key: string]: {
+        Row: Record<string, unknown>;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+      };
+    };
+    Functions: {
+      get_subject_progress: {
+        Args: { subject_id: string; current_user_id: string };
+        Returns: number;
+      };
+    };
+    Enums: {
+      [key: string]: never;
+    };
+    CompositeTypes: {
+      [key: string]: never;
+    };
   };
-}
+};
+
+// Export Tables type for convenience
+export type Tables = Database['public']['Tables'];
