@@ -5,7 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
+import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 import SubjectsPage from "./pages/SubjectsPage";
 import SubjectDetailPage from "./pages/SubjectDetailPage";
 import LessonPage from "./pages/LessonPage";
@@ -26,18 +29,62 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/subjects" element={<SubjectsPage />} />
             <Route path="/subject/:subjectId" element={<SubjectDetailPage />} />
-            <Route path="/subject/:subjectId/lesson/:lessonId" element={<LessonPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/subjects" element={<AdminSubjects />} />
-            <Route path="/admin/subjects/:subjectId/lessons" element={<AdminLessons />} />
+            <Route 
+              path="/subject/:subjectId/lesson/:lessonId" 
+              element={
+                <ProtectedRoute>
+                  <LessonPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/subjects" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminSubjects />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/subjects/:subjectId/lessons" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminLessons />
+                </ProtectedRoute>
+              } 
+            />
             {/* Redirect double slash to single slash */}
             <Route 
               path="/admin/subjects//lessons" 
               element={<Navigate to="/admin/subjects" replace />} 
             />
-            <Route path="/admin/editor/:type/:id" element={<AdminEditor />} />
+            <Route 
+              path="/admin/editor/:type/:id" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminEditor />
+                </ProtectedRoute>
+              } 
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

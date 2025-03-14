@@ -1,13 +1,44 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Menu, X, BookOpen, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { signOut } from "@/api";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, profile, isAuthenticated, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully",
+      });
+      navigate("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
@@ -29,13 +60,43 @@ const Header = () => {
           <Link to="/subjects" className="text-sm font-medium transition-colors hover:text-primary">
             Subjects
           </Link>
-          <Link to="/admin" className="text-sm font-medium transition-colors hover:text-primary">
-            Admin
-          </Link>
-          <Button size="sm">
-            <User className="h-4 w-4 mr-2" />
-            Sign In
-          </Button>
+          {isAdmin && (
+            <Link to="/admin" className="text-sm font-medium transition-colors hover:text-primary">
+              Admin
+            </Link>
+          )}
+          
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  {profile?.name || 'Account'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => navigate("/profile")}
+                >
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button size="sm" onClick={() => navigate("/auth")}>
+              <User className="h-4 w-4 mr-2" />
+              Sign In
+            </Button>
+          )}
         </nav>
 
         {/* Mobile Menu Button */}
@@ -66,17 +127,45 @@ const Header = () => {
                 >
                   Subjects
                 </Link>
-                <Link 
-                  to="/admin" 
-                  className="text-sm font-medium transition-colors hover:text-primary"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Admin
-                </Link>
-                <Button size="sm" className="w-full">
-                  <User className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
+                {isAdmin && (
+                  <Link 
+                    to="/admin" 
+                    className="text-sm font-medium transition-colors hover:text-primary"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Admin
+                  </Link>
+                )}
+                
+                {isAuthenticated ? (
+                  <>
+                    <Link 
+                      to="/profile"
+                      className="text-sm font-medium transition-colors hover:text-primary"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                    <Button variant="outline" className="w-full" onClick={() => {
+                      handleSignOut();
+                      setIsMenuOpen(false);
+                    }}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      navigate("/auth");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Button>
+                )}
               </nav>
             </div>
           </div>

@@ -10,8 +10,10 @@ import {
   Code, 
   FileText,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Loader
 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,8 +38,18 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { subjects, lessons } from "@/lib/mock-data";
-import { Subject, Lesson, EditorBlock } from "@/types";
+import { useToast } from "@/components/ui/use-toast";
+import { 
+  getSubjects, 
+  getSubjectById, 
+  createSubject, 
+  updateSubject, 
+  deleteSubject,
+  getLessonById,
+  createLesson,
+  updateLesson,
+  deleteLesson
+} from "@/api";
 
 type EditorType = 'subject' | 'lesson';
 
@@ -46,84 +58,247 @@ const AdminEditor = () => {
   const [searchParams] = useSearchParams();
   const subjectIdFromParams = searchParams.get('subjectId');
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState(subjectIdFromParams || "");
   const [image, setImage] = useState("");
-  const [editorBlocks, setEditorBlocks] = useState<EditorBlock[]>([]);
+  const [lesson_order, setLessonOrder] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [showAiPreview, setShowAiPreview] = useState(false);
-  const [loading, setLoading] = useState(id !== 'new');
 
   const isNewItem = id === 'new';
   const isSubjectEditor = type === 'subject';
   const isLessonEditor = type === 'lesson';
 
-  useEffect(() => {
-    if (isNewItem) {
-      setLoading(false);
-      return;
+  // Fetch subjects for the dropdown
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: getSubjects,
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching subjects:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load subjects. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
+  });
 
-    // In a real app, this would be a database query
-    if (isSubjectEditor) {
-      const subject = subjects.find(s => s.id === id);
-      if (subject) {
-        setTitle(subject.title);
-        setDescription(subject.description);
-        setImage(subject.image);
-      }
-    } else if (isLessonEditor) {
-      // Find the lesson
-      let foundLesson: Lesson | undefined;
-      let foundSubjectId = "";
-      
-      // Search through all subjects' lessons
-      Object.entries(lessons).forEach(([subjId, lessonList]) => {
-        const lesson = lessonList.find(l => l.id === id);
-        if (lesson) {
-          foundLesson = lesson;
-          foundSubjectId = subjId;
-        }
-      });
-      
-      if (foundLesson) {
-        setTitle(foundLesson.title);
-        setContent(foundLesson.content);
-        setSelectedSubjectId(foundSubjectId);
+  // Fetch subject or lesson data if editing
+  const { data: currentItem, isLoading: isLoadingItem } = useQuery({
+    queryKey: [isSubjectEditor ? 'subject' : 'lesson', id],
+    queryFn: () => isSubjectEditor 
+      ? getSubjectById(id) 
+      : getLessonById(id),
+    enabled: !isNewItem && !!id,
+    meta: {
+      onError: (err: Error) => {
+        console.error(`Error fetching ${type}:`, err);
+        toast({
+          title: "Error",
+          description: `Failed to load ${type} details. Please try again later.`,
+          variant: "destructive",
+        });
       }
     }
-    
-    setLoading(false);
-  }, [id, type, isNewItem, isSubjectEditor, isLessonEditor]);
+  });
+
+  // Fetch the max lesson order from the subject if creating a new lesson
+  const { data: subjectLessons = [] } = useQuery({
+    queryKey: ['lessons', selectedSubjectId],
+    queryFn: () => getLessonsBySubjectId(selectedSubjectId),
+    enabled: isLessonEditor && isNewItem && !!selectedSubjectId,
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching lessons:", err);
+      }
+    }
+  });
+
+  // Set up mutations for saving
+  const createSubjectMutation = useMutation({
+    mutationFn: createSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      toast({
+        title: "Success",
+        description: "Subject created successfully",
+      });
+      navigate("/admin/subjects");
+    },
+    onError: (error: any) => {
+      console.error("Error creating subject:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create subject. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateSubjectMutation = useMutation({
+    mutationFn: (data: { id: string, subject: Partial<any> }) => 
+      updateSubject(data.id, data.subject),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['subject', id] });
+      toast({
+        title: "Success",
+        description: "Subject updated successfully",
+      });
+      navigate("/admin/subjects");
+    },
+    onError: (error: any) => {
+      console.error("Error updating subject:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update subject. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const createLessonMutation = useMutation({
+    mutationFn: createLesson,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons', selectedSubjectId] });
+      toast({
+        title: "Success",
+        description: "Lesson created successfully",
+      });
+      navigate(`/admin/subjects/${selectedSubjectId}/lessons`);
+    },
+    onError: (error: any) => {
+      console.error("Error creating lesson:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create lesson. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateLessonMutation = useMutation({
+    mutationFn: (data: { id: string, lesson: Partial<any> }) => 
+      updateLesson(data.id, data.lesson),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons', selectedSubjectId] });
+      queryClient.invalidateQueries({ queryKey: ['lesson', id] });
+      toast({
+        title: "Success",
+        description: "Lesson updated successfully",
+      });
+      navigate(`/admin/subjects/${selectedSubjectId}/lessons`);
+    },
+    onError: (error: any) => {
+      console.error("Error updating lesson:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update lesson. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const deleteItemMutation = useMutation({
+    mutationFn: () => isSubjectEditor 
+      ? deleteSubject(id || '')
+      : deleteLesson(id || ''),
+    onSuccess: () => {
+      if (isSubjectEditor) {
+        queryClient.invalidateQueries({ queryKey: ['subjects'] });
+        navigate("/admin/subjects");
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['lessons', selectedSubjectId] });
+        navigate(`/admin/subjects/${selectedSubjectId}/lessons`);
+      }
+      toast({
+        title: "Success",
+        description: `${type === 'subject' ? 'Subject' : 'Lesson'} deleted successfully`,
+      });
+    },
+    onError: (error: any) => {
+      console.error(`Error deleting ${type}:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to delete ${type}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Effect to set initial values when editing an existing item
+  useEffect(() => {
+    if (!isNewItem && currentItem) {
+      if (isSubjectEditor && 'title' in currentItem) {
+        setTitle(currentItem.title);
+        setDescription(currentItem.description);
+        setImage(currentItem.image || '');
+      } else if (isLessonEditor && 'title' in currentItem) {
+        setTitle(currentItem.title);
+        setContent(currentItem.content);
+        setSelectedSubjectId(currentItem.subject_id);
+        setLessonOrder(currentItem.lesson_order);
+      }
+    }
+  }, [currentItem, isNewItem, isSubjectEditor, isLessonEditor]);
+
+  // Effect to set the next lesson order when creating a new lesson
+  useEffect(() => {
+    if (isLessonEditor && isNewItem && subjectLessons.length > 0) {
+      const maxOrder = Math.max(...subjectLessons.map(lesson => lesson.lesson_order));
+      setLessonOrder(maxOrder + 1);
+    }
+  }, [isLessonEditor, isNewItem, subjectLessons]);
 
   const handleSave = () => {
-    // In a real app, this would save to the database
-    console.log("Saving...", { type, id, title, description, content, selectedSubjectId, image });
-    
     if (isSubjectEditor) {
+      const subjectData = {
+        title,
+        description,
+        image: image || null
+      };
+
       if (isNewItem) {
-        // Create new subject
-        const newId = title.toLowerCase().replace(/\s+/g, '-');
-        console.log("Creating new subject with ID:", newId);
+        createSubjectMutation.mutate(subjectData);
       } else {
-        // Update existing subject
-        console.log("Updating subject with ID:", id);
+        updateSubjectMutation.mutate({ 
+          id: id || '', 
+          subject: subjectData 
+        });
       }
-      navigate("/admin/subjects");
     } else if (isLessonEditor) {
-      if (isNewItem) {
-        // Create new lesson
-        const newId = `${selectedSubjectId}-lesson-${Date.now()}`;
-        console.log("Creating new lesson with ID:", newId);
-      } else {
-        // Update existing lesson
-        console.log("Updating lesson with ID:", id);
+      if (!selectedSubjectId) {
+        toast({
+          title: "Error",
+          description: "Please select a subject",
+          variant: "destructive",
+        });
+        return;
       }
-      navigate(`/admin/subjects/${selectedSubjectId}/lessons`);
+
+      const lessonData = {
+        title,
+        content,
+        subject_id: selectedSubjectId,
+        lesson_order: lesson_order
+      };
+
+      if (isNewItem) {
+        createLessonMutation.mutate(lessonData);
+      } else {
+        updateLessonMutation.mutate({ 
+          id: id || '', 
+          lesson: lessonData 
+        });
+      }
     }
   };
 
@@ -132,20 +307,11 @@ const AdminEditor = () => {
   };
 
   const confirmDelete = () => {
-    // In a real app, this would delete from the database
-    console.log("Deleting...", { type, id });
-    
-    if (isSubjectEditor) {
-      navigate("/admin/subjects");
-    } else if (isLessonEditor) {
-      navigate(`/admin/subjects/${selectedSubjectId}/lessons`);
-    }
-    
-    setIsDeleteDialogOpen(false);
+    deleteItemMutation.mutate();
   };
 
   const requestAiSuggestion = () => {
-    // In a real app, this would call the Gemini API
+    // Mock AI suggestion
     setTimeout(() => {
       setAiSuggestion(
         "# Suggested Content\n\nHere's a comprehensive explanation of this topic with key points:\n\n" +
@@ -166,7 +332,15 @@ const AdminEditor = () => {
     }, 1500);
   };
 
-  if (loading) {
+  const isSaving = 
+    createSubjectMutation.isPending || 
+    updateSubjectMutation.isPending ||
+    createLessonMutation.isPending ||
+    updateLessonMutation.isPending;
+
+  const isDeleting = deleteItemMutation.isPending;
+
+  if (isLoadingItem && !isNewItem) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -209,14 +383,39 @@ const AdminEditor = () => {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSave}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save
+                <Button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save
+                    </>
+                  )}
                 </Button>
                 {!isNewItem && (
-                  <Button variant="destructive" onClick={handleDelete}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
@@ -278,6 +477,18 @@ const AdminEditor = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="order">Lesson Order</Label>
+                  <Input
+                    id="order"
+                    type="number"
+                    min="1"
+                    value={lesson_order}
+                    onChange={(e) => setLessonOrder(parseInt(e.target.value))}
+                    className="mt-1"
+                  />
                 </div>
 
                 <div className="border rounded-md p-4">
@@ -355,8 +566,12 @@ Use Markdown to format your content. You can include:
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

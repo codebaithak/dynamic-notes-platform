@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
   Plus, 
@@ -11,8 +11,10 @@ import {
   Eye,
   ArrowUp,
   ArrowDown,
-  Book
+  Book,
+  Loader
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,29 +41,100 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { subjects, lessons } from "@/lib/mock-data";
-import { Subject, Lesson } from "@/types";
+import { useToast } from "@/components/ui/use-toast";
+import { getSubjectById, getLessonsBySubjectId, deleteLesson, updateLesson } from "@/api";
 
 const AdminLessons = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [subjectLessons, setSubjectLessons] = useState<Lesson[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
-  useEffect(() => {
-    // In a real app, this would be a database query
-    const foundSubject = subjects.find(s => s.id === subjectId);
-    const foundLessons = lessons[subjectId || ""] || [];
-    
-    setSubject(foundSubject || null);
-    setSubjectLessons(foundLessons);
-    setLoading(false);
-  }, [subjectId]);
+  // Fetch subject details
+  const { 
+    data: subject, 
+    isLoading: isLoadingSubject, 
+    error: subjectError 
+  } = useQuery({
+    queryKey: ['subject', subjectId],
+    queryFn: () => getSubjectById(subjectId || ''),
+    enabled: !!subjectId,
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching subject:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load subject details. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  });
 
-  const filteredLessons = subjectLessons.filter(lesson => 
+  // Fetch lessons for this subject
+  const { 
+    data: lessons = [], 
+    isLoading: isLoadingLessons, 
+    error: lessonsError 
+  } = useQuery({
+    queryKey: ['lessons', subjectId],
+    queryFn: () => getLessonsBySubjectId(subjectId || ''),
+    enabled: !!subjectId,
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching lessons:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load lessons. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  });
+
+  // Delete lesson mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteLesson,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons', subjectId] });
+      toast({
+        title: "Success",
+        description: "Lesson deleted successfully",
+      });
+      setIsDeleteDialogOpen(false);
+      setLessonToDelete(null);
+    },
+    onError: (error: any) => {
+      console.error("Error deleting lesson:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete lesson. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update lesson order mutation
+  const updateOrderMutation = useMutation({
+    mutationFn: (data: { id: string, lesson: Partial<any> }) => 
+      updateLesson(data.id, data.lesson),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons', subjectId] });
+    },
+    onError: (error: any) => {
+      console.error("Error updating lesson order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update lesson order. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const filteredLessons = lessons.filter(lesson => 
     lesson.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -71,18 +144,49 @@ const AdminLessons = () => {
   };
 
   const handleDeleteConfirm = () => {
-    // Here you would actually delete the lesson
-    console.log(`Deleting lesson: ${lessonToDelete}`);
-    setIsDeleteDialogOpen(false);
-    setLessonToDelete(null);
+    if (lessonToDelete) {
+      deleteMutation.mutate(lessonToDelete);
+    }
   };
 
-  const handleMoveLesson = (lessonId: string, direction: 'up' | 'down') => {
-    // Here you would update the order of lessons
-    console.log(`Moving lesson ${lessonId} ${direction}`);
+  const handleMoveLesson = (lesson: any, direction: 'up' | 'down') => {
+    const sortedLessons = [...lessons].sort((a, b) => a.lesson_order - b.lesson_order);
+    const currentIndex = sortedLessons.findIndex(l => l.id === lesson.id);
+    
+    if (direction === 'up' && currentIndex > 0) {
+      const prevLesson = sortedLessons[currentIndex - 1];
+      
+      // Swap orders
+      updateOrderMutation.mutate({
+        id: lesson.id,
+        lesson: { lesson_order: prevLesson.lesson_order }
+      });
+      
+      updateOrderMutation.mutate({
+        id: prevLesson.id,
+        lesson: { lesson_order: lesson.lesson_order }
+      });
+    } 
+    else if (direction === 'down' && currentIndex < sortedLessons.length - 1) {
+      const nextLesson = sortedLessons[currentIndex + 1];
+      
+      // Swap orders
+      updateOrderMutation.mutate({
+        id: lesson.id,
+        lesson: { lesson_order: nextLesson.lesson_order }
+      });
+      
+      updateOrderMutation.mutate({
+        id: nextLesson.id,
+        lesson: { lesson_order: lesson.lesson_order }
+      });
+    }
   };
 
-  if (loading) {
+  const isLoading = isLoadingSubject || isLoadingLessons;
+  const error = subjectError || lessonsError;
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -93,7 +197,7 @@ const AdminLessons = () => {
     );
   }
 
-  if (!subject) {
+  if (error || !subject) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -109,6 +213,9 @@ const AdminLessons = () => {
       </div>
     );
   }
+
+  // Sort lessons by order
+  const sortedLessons = [...filteredLessons].sort((a, b) => a.lesson_order - b.lesson_order);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -153,7 +260,7 @@ const AdminLessons = () => {
             </div>
           </div>
 
-          {filteredLessons.length > 0 ? (
+          {sortedLessons.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -164,28 +271,42 @@ const AdminLessons = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLessons.map((lesson) => (
+                  {sortedLessons.map((lesson) => (
                     <TableRow key={lesson.id}>
-                      <TableCell>{lesson.order}</TableCell>
+                      <TableCell>{lesson.lesson_order}</TableCell>
                       <TableCell className="font-medium">{lesson.title}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end">
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => handleMoveLesson(lesson.id, 'up')}
-                            disabled={lesson.order === 1}
+                            onClick={() => handleMoveLesson(lesson, 'up')}
+                            disabled={
+                              updateOrderMutation.isPending || 
+                              lesson.lesson_order === Math.min(...sortedLessons.map(l => l.lesson_order))
+                            }
                           >
-                            <ArrowUp className="h-4 w-4" />
+                            {updateOrderMutation.isPending ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArrowUp className="h-4 w-4" />
+                            )}
                             <span className="sr-only">Move up</span>
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => handleMoveLesson(lesson.id, 'down')}
-                            disabled={lesson.order === filteredLessons.length}
+                            onClick={() => handleMoveLesson(lesson, 'down')}
+                            disabled={
+                              updateOrderMutation.isPending || 
+                              lesson.lesson_order === Math.max(...sortedLessons.map(l => l.lesson_order))
+                            }
                           >
-                            <ArrowDown className="h-4 w-4" />
+                            {updateOrderMutation.isPending ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArrowDown className="h-4 w-4" />
+                            )}
                             <span className="sr-only">Move down</span>
                           </Button>
                           <DropdownMenu>
@@ -255,8 +376,12 @@ const AdminLessons = () => {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
