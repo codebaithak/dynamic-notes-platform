@@ -16,8 +16,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSubjects from "./pages/admin/AdminSubjects";
 import AdminLessons from "./pages/admin/AdminLessons";
 import AdminEditor from "./pages/admin/AdminEditor";
-import AdminLogin from "./pages/admin/AdminLogin";
-import AdminUsers from "./pages/admin/AdminUsers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,7 +30,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
             <Route 
               path="/profile" 
               element={
@@ -64,14 +61,6 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminSubjects />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/users" 
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AdminUsers />
                 </ProtectedRoute>
               } 
             />
