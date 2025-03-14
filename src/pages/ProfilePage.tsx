@@ -61,6 +61,15 @@ const ProfilePage = () => {
   };
 
   const handleSaveProfile = () => {
+    if (!profile) {
+      toast({
+        title: "Error",
+        description: "Profile not available. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     updateProfileMutation.mutate({
       name,
       avatar: avatarUrl
@@ -82,10 +91,31 @@ const ProfilePage = () => {
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p>Loading profile...</p>
+          <div className="w-full max-w-md space-y-4">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold">Loading profile...</h2>
+            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-20 rounded-full mx-auto" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-6 w-[60%] mx-auto" />
+                    <Skeleton className="h-4 w-[40%] mx-auto" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </main>
       </div>
     );
+  }
+
+  // If no user is found, redirect to auth page
+  if (!user && !authLoading) {
+    navigate("/auth");
+    return null;
   }
 
   return (
