@@ -16,13 +16,15 @@ const SubjectsPage = () => {
   const { data: subjects = [], isLoading, error } = useQuery({
     queryKey: ['subjects'],
     queryFn: getSubjects,
-    onError: (err) => {
-      console.error("Error fetching subjects:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load subjects. Please try again later.",
-        variant: "destructive",
-      });
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching subjects:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load subjects. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   });
 

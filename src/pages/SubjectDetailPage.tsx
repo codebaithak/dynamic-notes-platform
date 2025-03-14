@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getSubjectById, getLessonsBySubjectId } from "@/api";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -23,13 +23,15 @@ const SubjectDetailPage = () => {
     queryKey: ['subject', subjectId],
     queryFn: () => getSubjectById(subjectId || ''),
     enabled: !!subjectId,
-    onError: (err) => {
-      console.error("Error fetching subject:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load subject details. Please try again later.",
-        variant: "destructive",
-      });
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching subject:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load subject details. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   });
 
@@ -42,13 +44,15 @@ const SubjectDetailPage = () => {
     queryKey: ['lessons', subjectId],
     queryFn: () => getLessonsBySubjectId(subjectId || ''),
     enabled: !!subjectId,
-    onError: (err) => {
-      console.error("Error fetching lessons:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load lessons. Please try again later.",
-        variant: "destructive",
-      });
+    meta: {
+      onError: (err: Error) => {
+        console.error("Error fetching lessons:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load lessons. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   });
 
