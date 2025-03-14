@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,13 +49,25 @@ const AdminLogin = () => {
       setIsLoading(true);
       await signIn(email, password);
       
-      // We don't need to manually check admin status here
-      // The auth state change listener will handle this
+      // We need to check admin status after login
+      const { isAdmin } = useAuth();
+      
+      if (!isAdmin) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have administrator privileges",
+          variant: "destructive",
+        });
+        // Sign out and redirect to home
+        navigate("/");
+        return;
+      }
+      
       toast({
         title: "Success",
-        description: "Signed in successfully",
+        description: "Signed in as administrator",
       });
-      // Don't navigate here, let the auth state change handle it
+      navigate("/admin");
     } catch (error: any) {
       console.error("Admin sign in error:", error);
       toast({
