@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSubjectById, getLessonById, createSubject, updateSubject, createLesson, updateLesson } from "@/api";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { SubjectWithProgress, Lesson } from "@/integrations/supabase/database.types";
 
 type EditorType = "subject" | "lesson";
 
@@ -61,20 +62,28 @@ const AdminEditor = () => {
     }
   });
   
+  // Type guard to check if data is a Subject
+  const isSubject = (data: any): data is SubjectWithProgress => {
+    return data && 'description' in data;
+  };
+  
+  // Type guard to check if data is a Lesson
+  const isLesson = (data: any): data is Lesson => {
+    return data && 'content' in data;
+  };
+  
   // Load data into form fields when available
   useEffect(() => {
     if (data && !isLoading) {
-      if (type === "subject") {
-        const subject = data;
-        setTitle(subject.title);
-        setDescription(subject.description);
-        setImage(subject.image || "");
-      } else if (type === "lesson") {
-        const lesson = data;
-        setTitle(lesson.title);
-        setContent(lesson.content);
-        setSubjectId(lesson.subject_id);
-        setLessonOrder(lesson.lesson_order);
+      if (type === "subject" && isSubject(data)) {
+        setTitle(data.title);
+        setDescription(data.description);
+        setImage(data.image || "");
+      } else if (type === "lesson" && isLesson(data)) {
+        setTitle(data.title);
+        setContent(data.content);
+        setSubjectId(data.subject_id);
+        setLessonOrder(data.lesson_order);
       }
     }
   }, [data, isLoading, type]);
