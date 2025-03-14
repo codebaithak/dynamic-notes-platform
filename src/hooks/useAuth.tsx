@@ -35,8 +35,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (currentUser) {
           setUser(currentUser);
-          const userProfile = await getCurrentUserProfile();
-          setProfile(userProfile);
+          try {
+            const userProfile = await getCurrentUserProfile();
+            setProfile(userProfile);
+          } catch (profileError) {
+            console.error('Error getting user profile:', profileError);
+            // Don't set profile to null if there's an error fetching the profile
+            // This prevents an infinite loading state if the profile fetch fails
+          }
         } else {
           setUser(null);
           setProfile(null);
@@ -46,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
       } finally {
+        // Ensure loading state is always turned off, even if there's an error
         setIsLoading(false);
       }
     };
@@ -57,12 +64,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, session) => {
         if (session?.user) {
           setUser(session.user);
-          const userProfile = await getCurrentUserProfile();
-          setProfile(userProfile);
+          try {
+            const userProfile = await getCurrentUserProfile();
+            setProfile(userProfile);
+          } catch (profileError) {
+            console.error('Error getting user profile during auth change:', profileError);
+            // Don't prevent the app from loading if profile fetch fails
+          }
         } else {
           setUser(null);
           setProfile(null);
         }
+        // Always set loading to false after auth state change
         setIsLoading(false);
       }
     );
