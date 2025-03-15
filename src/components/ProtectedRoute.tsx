@@ -1,9 +1,10 @@
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ProtectedRouteProps = {
   children: ReactNode;
@@ -13,6 +14,18 @@ type ProtectedRouteProps = {
 const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    if (isLoading) {
+      console.log('ProtectedRoute: Loading auth state...');
+    } else if (!isAuthenticated) {
+      console.log('ProtectedRoute: User not authenticated, will redirect');
+    } else if (requireAdmin && !isAdmin) {
+      console.log('ProtectedRoute: Admin access required but user is not admin');
+    } else {
+      console.log('ProtectedRoute: Access granted to', user?.id);
+    }
+  }, [isLoading, isAuthenticated, isAdmin, requireAdmin, user]);
 
   // Show loading UI while checking authentication
   if (isLoading) {

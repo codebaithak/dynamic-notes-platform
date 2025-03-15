@@ -1,11 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/api";
 import { useToast } from "@/components/ui/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +18,23 @@ import {
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, profile, isAuthenticated, isAdmin, isLoading } = useAuth();
+  const [displayName, setDisplayName] = useState<string>("Account");
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (profile?.name) {
+        setDisplayName(profile.name);
+      } else if (user?.email) {
+        setDisplayName(user.email.split('@')[0]);
+      } else if (user?.user_metadata?.name) {
+        setDisplayName(user.user_metadata.name);
+      } else if (!isAuthenticated) {
+        setDisplayName("Account");
+      }
+    }
+  }, [isLoading, profile, user, isAuthenticated]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -39,9 +55,6 @@ const Header = () => {
       });
     }
   };
-
-  // Determine the display name
-  const displayName = profile?.name || user?.email?.split('@')[0] || 'Profile';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
@@ -74,7 +87,11 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {!isLoading ? displayName : 'Loading...'}
+                  {isLoading ? (
+                    <Skeleton className="h-4 w-16" />
+                  ) : (
+                    displayName
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut, updateProfile } from "@/api";
@@ -100,7 +101,7 @@ const ProfilePage = () => {
     );
   }
 
-  // Redirect if not authenticated (this should be handled by ProtectedRoute, but as a fallback)
+  // Redirect if not authenticated
   if (!user) {
     navigate("/auth");
     return null;
@@ -126,7 +127,9 @@ const ProfilePage = () => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-center sm:text-left space-y-1">
-                    <CardTitle className="text-2xl">{profile?.name || user?.email?.split('@')[0] || "User"}</CardTitle>
+                    <CardTitle className="text-2xl">
+                      {profile?.name || user?.email?.split('@')[0] || user?.user_metadata?.name || "User"}
+                    </CardTitle>
                     <CardDescription>{user?.email}</CardDescription>
                     <CardDescription>
                       Role: {profile?.role === 'admin' ? 'Administrator' : 'Student'}
