@@ -10,6 +10,9 @@ import {
 
 // Subjects API
 export const getSubjects = async (): Promise<SubjectWithProgress[]> => {
+  console.log('Fetching subjects');
+  const { data: { session } } = await supabase.auth.getSession();
+  
   const { data: subjects, error } = await supabase
     .from('subjects')
     .select('*');
@@ -29,15 +32,19 @@ export const getSubjects = async (): Promise<SubjectWithProgress[]> => {
 
       // Get progress if user is authenticated
       let progress = undefined;
-      const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        const { data: result } = await supabase
-          .rpc('get_subject_progress', {
-            subject_id: subject.id,
-            current_user_id: session.user.id
-          });
-        progress = result;
+        try {
+          const { data: result } = await supabase
+            .rpc('get_subject_progress', {
+              subject_id: subject.id,
+              current_user_id: session.user.id
+            });
+          progress = result;
+        } catch (progressError) {
+          console.error('Error getting subject progress:', progressError);
+          // Continue without progress if there's an error
+        }
       }
 
       return {
@@ -52,6 +59,9 @@ export const getSubjects = async (): Promise<SubjectWithProgress[]> => {
 };
 
 export const getSubjectById = async (id: string): Promise<SubjectWithProgress | null> => {
+  console.log('Fetching subject by ID:', id);
+  const { data: { session } } = await supabase.auth.getSession();
+  
   const { data: subject, error } = await supabase
     .from('subjects')
     .select('*')
@@ -75,15 +85,19 @@ export const getSubjectById = async (id: string): Promise<SubjectWithProgress | 
 
   // Get progress if user is authenticated
   let progress = undefined;
-  const { data: { session } } = await supabase.auth.getSession();
   
   if (session?.user) {
-    const { data: result } = await supabase
-      .rpc('get_subject_progress', {
-        subject_id: id,
-        current_user_id: session.user.id
-      });
-    progress = result;
+    try {
+      const { data: result } = await supabase
+        .rpc('get_subject_progress', {
+          subject_id: id,
+          current_user_id: session.user.id
+        });
+      progress = result;
+    } catch (progressError) {
+      console.error('Error getting subject progress:', progressError);
+      // Continue without progress if there's an error
+    }
   }
 
   return {
@@ -145,6 +159,7 @@ export const deleteSubject = async (id: string): Promise<void> => {
 
 // Lessons API
 export const getLessonsBySubjectId = async (subjectId: string): Promise<Lesson[]> => {
+  console.log('Fetching lessons for subject ID:', subjectId);
   const { data, error } = await supabase
     .from('lessons')
     .select('*')
@@ -378,22 +393,41 @@ export const deleteComment = async (id: string): Promise<void> => {
 
 // Authentication methods
 export const getCurrentUser = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+  console.log('Getting current user');
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error) {
+    console.error('Error getting session:', error);
+    throw error;
+  }
+  
   return session?.user || null;
 };
 
 export const getCurrentUserProfile = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+  console.log('Getting current user profile');
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (sessionError) {
+    console.error('Error getting session:', sessionError);
+    throw sessionError;
+  }
   
   if (!session?.user) {
+    console.log('No session found when getting user profile');
     return null;
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', session.user.id)
     .single();
+
+  if (profileError) {
+    console.error('Error fetching user profile:', profileError);
+    throw profileError;
+  }
 
   return profile;
 };

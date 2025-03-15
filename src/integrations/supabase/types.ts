@@ -179,13 +179,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_subject_progress: {
-        Args: {
-          subject_id: string
-          current_user_id: string
-        }
-        Returns: number
-      }
+      get_subject_progress:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              subject_id: number
+              progress: number
+            }[]
+          }
+        | {
+            Args: {
+              subject_id: string
+              current_user_id: string
+            }
+            Returns: number
+          }
     }
     Enums: {
       [_ in never]: never

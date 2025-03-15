@@ -27,42 +27,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        setIsLoading(true);
-        const currentUser = await getCurrentUser();
-        
-        if (currentUser) {
-          setUser(currentUser);
+  const fetchUserAndProfile = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Fetching current user and profile...');
+      
+      const currentUser = await getCurrentUser();
+      console.log('Current user:', currentUser);
+      
+      if (currentUser) {
+        setUser(currentUser);
+        try {
           const userProfile = await getCurrentUserProfile();
+          console.log('User profile:', userProfile);
           setProfile(userProfile);
-        } else {
-          setUser(null);
+        } catch (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          // Still set isLoading to false even if profile fetch fails
           setProfile(null);
         }
-      } catch (error) {
-        console.error('Error getting user:', error);
+      } else {
         setUser(null);
         setProfile(null);
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Error in auth state check:', error);
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    getUser();
+  useEffect(() => {
+    // Initial fetch
+    fetchUserAndProfile();
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, !!session);
+        
         if (session?.user) {
           setUser(session.user);
-          const userProfile = await getCurrentUserProfile();
-          setProfile(userProfile);
+          try {
+            const userProfile = await getCurrentUserProfile();
+            setProfile(userProfile);
+          } catch (profileError) {
+            console.error('Error fetching user profile on auth change:', profileError);
+            setProfile(null);
+          }
         } else {
           setUser(null);
           setProfile(null);
         }
+        
         setIsLoading(false);
       }
     );
