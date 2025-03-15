@@ -1,6 +1,6 @@
 
 import { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader } from "lucide-react";
@@ -11,8 +11,10 @@ type ProtectedRouteProps = {
 };
 
 const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
-  const { isAuthenticated, isAdmin, isLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
+  const location = useLocation();
 
+  // Show loading UI while checking authentication
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -32,7 +34,13 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
   // If not authenticated, redirect to auth page
   if (!isAuthenticated) {
     console.log('User not authenticated, redirecting to auth page');
-    return <Navigate to="/auth" replace />;
+    // Save the location they were trying to access for potential redirect after login
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Log debugging info for admin access
+  if (requireAdmin) {
+    console.log('Admin check - isAdmin:', isAdmin, 'User:', user?.id);
   }
 
   // If admin is required but user is not admin, redirect to subjects

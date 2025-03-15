@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { User, LogOut, Save, Loader } from "lucide-react";
@@ -15,12 +15,20 @@ import { signOut, updateProfile } from "@/api";
 
 const ProfilePage = () => {
   const { user, profile, isLoading: authLoading } = useAuth();
-  const [name, setName] = useState(profile?.name || "");
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar || "");
+  const [name, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Update local state when profile data changes
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || "");
+      setAvatarUrl(profile.avatar || "");
+    }
+  }, [profile]);
 
   const updateProfileMutation = useMutation({
     mutationFn: updateProfile,
@@ -77,15 +85,25 @@ const ProfilePage = () => {
       .substring(0, 2);
   };
 
+  // Show loading state while auth is being checked
   if (authLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p>Loading profile...</p>
+          <div className="flex flex-col items-center p-6">
+            <Loader className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-center text-lg font-medium">Loading your profile...</p>
+          </div>
         </main>
       </div>
     );
+  }
+
+  // Redirect if not authenticated (this should be handled by ProtectedRoute, but as a fallback)
+  if (!user) {
+    navigate("/auth");
+    return null;
   }
 
   return (
@@ -108,7 +126,7 @@ const ProfilePage = () => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-center sm:text-left space-y-1">
-                    <CardTitle className="text-2xl">{profile?.name}</CardTitle>
+                    <CardTitle className="text-2xl">{profile?.name || user?.email?.split('@')[0] || "User"}</CardTitle>
                     <CardDescription>{user?.email}</CardDescription>
                     <CardDescription>
                       Role: {profile?.role === 'admin' ? 'Administrator' : 'Student'}

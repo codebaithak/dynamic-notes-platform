@@ -40,10 +40,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           const userProfile = await getCurrentUserProfile();
           console.log('User profile:', userProfile);
-          setProfile(userProfile);
+          if (userProfile) {
+            setProfile(userProfile);
+          } else {
+            console.warn('User profile not found even though user is authenticated');
+            setProfile(null);
+          }
         } catch (profileError) {
           console.error('Error fetching user profile:', profileError);
-          // Still set isLoading to false even if profile fetch fails
           setProfile(null);
         }
       } else {
@@ -72,7 +76,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(session.user);
           try {
             const userProfile = await getCurrentUserProfile();
-            setProfile(userProfile);
+            if (userProfile) {
+              setProfile(userProfile);
+            } else {
+              console.warn('User profile not found after auth state change');
+              setProfile(null);
+            }
           } catch (profileError) {
             console.error('Error fetching user profile on auth change:', profileError);
             setProfile(null);
@@ -85,6 +94,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       }
     );
+
+    // Check for existing session on initial load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Checking existing session:', !!session);
+      if (session) {
+        setUser(session.user);
+        getCurrentUserProfile()
+          .then(userProfile => {
+            if (userProfile) {
+              setProfile(userProfile);
+            } else {
+              console.warn('User profile not found for existing session');
+            }
+            setIsLoading(false);
+          })
+          .catch(err => {
+            console.error('Error fetching profile for existing session:', err);
+            setIsLoading(false);
+          });
+      } else {
+        setIsLoading(false);
+      }
+    });
 
     return () => {
       subscription.unsubscribe();

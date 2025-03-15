@@ -16,7 +16,7 @@ import {
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, profile, isAuthenticated, isAdmin } = useAuth();
+  const { user, profile, isAuthenticated, isAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -39,6 +39,9 @@ const Header = () => {
       });
     }
   };
+
+  // Determine the display name
+  const displayName = profile?.name || user?.email?.split('@')[0] || 'Profile';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
@@ -71,7 +74,7 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {profile?.name || 'Account'}
+                  {!isLoading ? displayName : 'Loading...'}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
