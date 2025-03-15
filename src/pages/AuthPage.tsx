@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +15,30 @@ const AuthPage = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
-  // Redirect if already authenticated
+  // Get the redirect path from location state, or default to /subjects
+  const from = location.state?.from?.pathname || "/subjects";
+
+  // Check authentication and redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      console.log('User is authenticated, redirecting to:', from);
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate, from]);
+
+  // While checking auth, show nothing to prevent flicker
+  if (authLoading) {
+    return null;
+  }
+
+  // If authenticated, we should never reach here due to the effect above
+  // but as a safeguard, return null
   if (isAuthenticated) {
-    navigate("/subjects");
     return null;
   }
 
@@ -43,7 +60,7 @@ const AuthPage = () => {
         title: "Success",
         description: "Signed in successfully",
       });
-      navigate("/subjects");
+      // Navigate will happen automatically due to the useEffect
     } catch (error: any) {
       console.error("Sign in error:", error);
       toast({

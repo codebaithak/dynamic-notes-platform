@@ -49,25 +49,25 @@ const AdminLogin = () => {
       setIsLoading(true);
       await signIn(email, password);
       
-      // We need to check admin status after login
-      const { isAdmin } = useAuth();
-      
-      if (!isAdmin) {
-        toast({
-          title: "Access Denied",
-          description: "You don't have administrator privileges",
-          variant: "destructive",
-        });
-        // Sign out and redirect to home
-        navigate("/");
-        return;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Signed in as administrator",
-      });
-      navigate("/admin");
+      // After signin, check admin status (useAuth will refresh)
+      setTimeout(() => {
+        const { isAdmin } = useAuth();
+        
+        if (!isAdmin) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have administrator privileges",
+            variant: "destructive",
+          });
+          navigate("/");
+        } else {
+          toast({
+            title: "Success",
+            description: "Signed in as administrator",
+          });
+          navigate("/admin");
+        }
+      }, 500); // Give useAuth time to refresh
     } catch (error: any) {
       console.error("Admin sign in error:", error);
       toast({

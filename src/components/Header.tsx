@@ -18,21 +18,35 @@ import {
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, profile, isAuthenticated, isAdmin, isLoading } = useAuth();
-  const [displayName, setDisplayName] = useState<string>("Account");
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Update display name whenever auth state changes
   useEffect(() => {
-    if (!isLoading) {
-      if (profile?.name) {
-        setDisplayName(profile.name);
-      } else if (user?.email) {
-        setDisplayName(user.email.split('@')[0]);
-      } else if (user?.user_metadata?.name) {
-        setDisplayName(user.user_metadata.name);
-      } else if (!isAuthenticated) {
-        setDisplayName("Account");
-      }
+    if (isLoading) {
+      setDisplayName(null); // Set to null during loading
+      return;
+    }
+    
+    if (!isAuthenticated) {
+      setDisplayName("Account");
+      return;
+    }
+    
+    // Use profile name if available
+    if (profile?.name) {
+      setDisplayName(profile.name);
+      return;
+    }
+    
+    // Fall back to user email or metadata
+    if (user?.email) {
+      setDisplayName(user.email.split('@')[0]);
+    } else if (user?.user_metadata?.name) {
+      setDisplayName(user.user_metadata.name);
+    } else {
+      setDisplayName("User"); // Final fallback
     }
   }, [isLoading, profile, user, isAuthenticated]);
 
@@ -87,7 +101,7 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {isLoading ? (
+                  {isLoading || displayName === null ? (
                     <Skeleton className="h-4 w-16" />
                   ) : (
                     displayName
