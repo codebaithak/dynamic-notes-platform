@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Profile } from '@/integrations/supabase/database.types';
 
@@ -84,4 +83,41 @@ export const getAllUsers = async (): Promise<Profile[]> => {
   }
   
   return data;
+};
+
+// Function to create the lesson-images storage bucket if it doesn't exist
+export const ensureLessonImagesBucket = async (): Promise<void> => {
+  try {
+    // Check if bucket exists
+    const { data: buckets, error: bucketsError } = await supabase
+      .storage
+      .listBuckets();
+    
+    if (bucketsError) {
+      console.error('Error checking storage buckets:', bucketsError);
+      throw bucketsError;
+    }
+    
+    const bucketExists = buckets.some(bucket => bucket.name === 'lesson-images');
+    
+    if (!bucketExists) {
+      // Create new bucket
+      const { error: createError } = await supabase
+        .storage
+        .createBucket('lesson-images', {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+        });
+      
+      if (createError) {
+        console.error('Error creating lesson-images bucket:', createError);
+        throw createError;
+      }
+      
+      console.log('Created lesson-images bucket');
+    }
+  } catch (error) {
+    console.error('Error ensuring lesson-images bucket exists:', error);
+    throw error;
+  }
 };

@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Menu, BookOpen } from "lucide-react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -8,50 +8,114 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LessonContent from "@/components/LessonContent";
-import { subjects, lessons } from "@/lib/mock-data";
-import { Subject, Lesson } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
+import { getSubjectById, getLessonById, getLessonsBySubjectId } from "@/api";
+import { useToast } from "@/hooks/use-toast";
 
 const LessonPage = () => {
   const { subjectId, lessonId } = useParams<{ subjectId: string, lessonId: string }>();
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [subjectLessons, setSubjectLessons] = useState<Lesson[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    // In a real app, this would be a database query
-    const foundSubject = subjects.find(s => s.id === subjectId);
-    const foundLessons = lessons[subjectId || ""] || [];
-    const foundLesson = foundLessons.find(l => l.id === lessonId) || null;
-    
-    setSubject(foundSubject || null);
-    setSubjectLessons(foundLessons);
-    setLesson(foundLesson);
-    setLoading(false);
-  }, [subjectId, lessonId]);
+  // Fetch subject details
+  const { 
+    data: subject, 
+    isLoading: isLoadingSubject, 
+    error: subjectError 
+  } = useQuery({
+    queryKey: ['subject', subjectId],
+    queryFn: () => getSubjectById(subjectId || ''),
+    enabled: !!subjectId,
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching subject:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load subject details. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  });
+
+  // Fetch lessons for this subject
+  const { 
+    data: lessons = [], 
+    isLoading: isLoadingLessons, 
+    error: lessonsError 
+  } = useQuery({
+    queryKey: ['lessons', subjectId],
+    queryFn: () => getLessonsBySubjectId(subjectId || ''),
+    enabled: !!subjectId,
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching lessons:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load lessons. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  });
+
+  // Fetch current lesson
+  const {
+    data: lesson,
+    isLoading: isLoadingLesson,
+    error: lessonError
+  } = useQuery({
+    queryKey: ['lesson', lessonId],
+    queryFn: () => getLessonById(lessonId || ''),
+    enabled: !!lessonId,
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching lesson:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load lesson content. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  });
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
   // Find previous and next lessons
-  const currentIndex = lesson ? subjectLessons.findIndex(l => l.id === lesson.id) : -1;
-  const prevLesson = currentIndex > 0 ? subjectLessons[currentIndex - 1] : null;
-  const nextLesson = currentIndex < subjectLessons.length - 1 ? subjectLessons[currentIndex + 1] : null;
+  const sortedLessons = [...lessons].sort((a, b) => a.lesson_order - b.lesson_order);
+  const currentIndex = lesson ? sortedLessons.findIndex(l => l.id === lesson.id) : -1;
+  const prevLesson = currentIndex > 0 ? sortedLessons[currentIndex - 1] : null;
+  const nextLesson = currentIndex < sortedLessons.length - 1 ? sortedLessons[currentIndex + 1] : null;
 
-  if (loading) {
+  const isLoading = isLoadingSubject || isLoadingLessons || isLoadingLesson;
+  const error = subjectError || lessonsError || lessonError;
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p>Loading lesson...</p>
+          <div className="w-full max-w-3xl p-6">
+            <Skeleton className="h-8 w-1/3 mb-4" />
+            <Skeleton className="h-4 w-1/2 mb-8" />
+            <div className="space-y-4">
+              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
         </main>
       </div>
     );
   }
 
-  if (!subject || !lesson) {
+  if (error || !subject || !lesson) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -89,7 +153,7 @@ const LessonPage = () => {
             <div className="p-4">
               <h3 className="mb-2 text-sm font-medium">{subject.title}</h3>
               <ul className="space-y-1">
-                {subjectLessons.map((l) => (
+                {sortedLessons.map((l) => (
                   <li key={l.id}>
                     <Link 
                       to={`/subject/${subject.id}/lesson/${l.id}`}
@@ -98,7 +162,7 @@ const LessonPage = () => {
                         ${l.id === lesson.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}
                       `}
                     >
-                      <span className="mr-2 text-xs">{l.order}.</span>
+                      <span className="mr-2 text-xs">{l.lesson_order}.</span>
                       {l.title}
                     </Link>
                   </li>
@@ -138,7 +202,7 @@ const LessonPage = () => {
             <div className="mb-6">
               <h1 className="text-2xl font-bold">{lesson.title}</h1>
               <p className="text-muted-foreground">
-                Lesson {lesson.order} of {subjectLessons.length} in {subject.title}
+                Lesson {lesson.lesson_order} of {sortedLessons.length} in {subject.title}
               </p>
             </div>
 

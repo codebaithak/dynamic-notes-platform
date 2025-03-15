@@ -11,6 +11,9 @@ import { getSubjectById, getLessonById, createSubject, updateSubject, createLess
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SubjectWithProgress, Lesson } from "@/integrations/supabase/database.types";
+import RichTextEditor from "@/components/RichTextEditor";
+import ContentPreview from "@/components/ContentPreview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type EditorType = "subject" | "lesson";
 
@@ -20,7 +23,7 @@ const AdminEditor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
   
   // State for form fields
   const [title, setTitle] = useState("");
@@ -35,7 +38,7 @@ const AdminEditor = () => {
     navigate("/admin", { replace: true });
     return null;
   }
-  
+
   // If not new, fetch existing data
   const fetchData = async () => {
     if (isNew) return null;
@@ -50,9 +53,10 @@ const AdminEditor = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: [type, id],
     queryFn: fetchData,
-    enabled: !isNew && !!id,
+    enabled: !isNew && !!id && isAuthenticated,
     meta: {
       onError: (error: Error) => {
+        console.error("Error loading data:", error);
         toast({
           title: "Error",
           description: `Failed to load ${type}: ${error.message}`,
@@ -75,6 +79,7 @@ const AdminEditor = () => {
   // Load data into form fields when available
   useEffect(() => {
     if (data && !isLoading) {
+      console.log("Data loaded:", data);
       if (type === "subject" && isSubject(data)) {
         setTitle(data.title);
         setDescription(data.description);
@@ -116,6 +121,7 @@ const AdminEditor = () => {
       navigate("/admin/subjects");
     },
     onError: (error: Error) => {
+      console.error("Subject mutation error:", error);
       toast({
         title: "Error",
         description: `Failed to save subject: ${error.message}`,
@@ -126,6 +132,7 @@ const AdminEditor = () => {
   
   const lessonMutation = useMutation({
     mutationFn: (lesson: any) => {
+      console.log("Submitting lesson:", lesson);
       if (isNew) {
         return createLesson(lesson);
       } else {
@@ -141,6 +148,7 @@ const AdminEditor = () => {
       navigate(`/admin/subjects/${subjectId}/lessons`);
     },
     onError: (error: Error) => {
+      console.error("Lesson mutation error:", error);
       toast({
         title: "Error",
         description: `Failed to save lesson: ${error.message}`,
@@ -268,30 +276,44 @@ const AdminEditor = () => {
                 </>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <label htmlFor="content" className="text-sm font-medium">
-                      Lesson Content
-                    </label>
-                    <Textarea
-                      id="content"
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder="Enter lesson content (markdown supported)"
-                      rows={10}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="lessonOrder" className="text-sm font-medium">
-                      Lesson Order
-                    </label>
-                    <Input
-                      id="lessonOrder"
-                      type="number"
-                      value={lessonOrder}
-                      onChange={(e) => setLessonOrder(Number(e.target.value))}
-                      placeholder="Enter lesson order (e.g., 1, 2, 3)"
-                    />
-                  </div>
+                  <Tabs defaultValue="editor" className="w-full">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="editor">Editor</TabsTrigger>
+                      <TabsTrigger value="preview">Preview</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="editor" className="space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="content" className="text-sm font-medium">
+                          Lesson Content
+                        </label>
+                        <div className="min-h-[400px] border rounded-md">
+                          <RichTextEditor 
+                            value={content}
+                            onChange={setContent}
+                            placeholder="Enter lesson content (rich text and markdown supported)"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Use the toolbar to format text, add images, embed code blocks, and more.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="lessonOrder" className="text-sm font-medium">
+                          Lesson Order
+                        </label>
+                        <Input
+                          id="lessonOrder"
+                          type="number"
+                          value={lessonOrder}
+                          onChange={(e) => setLessonOrder(Number(e.target.value))}
+                          placeholder="Enter lesson order (e.g., 1, 2, 3)"
+                        />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="preview">
+                      <ContentPreview content={content} />
+                    </TabsContent>
+                  </Tabs>
                 </>
               )}
             </>
