@@ -67,10 +67,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         
         // Insert the image at the current selection point
         if (quill) {
-          const range = quill.getSelection(true);
+          // The error was here - we need to use a RangeStatic object instead of a number
+          const range = quill.getSelection() || { index: 0, length: 0 };
           quill.insertEmbed(range.index, 'image', publicUrl);
           // Move cursor after image
-          quill.setSelection(range.index + 1);
+          quill.setSelection(range.index + 1, 0);
         }
         
         toast({
