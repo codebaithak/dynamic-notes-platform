@@ -11,20 +11,20 @@ type ProtectedRouteProps = {
 };
 
 const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
-  const { isAuthenticated, isAdmin, isLoading, user, profile } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading, user, profile, session } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
-    // Enhanced logging for better debugging
     if (isLoading) {
-      console.log('ProtectedRoute: Authentication is loading...');
+      console.log('ProtectedRoute: Loading auth state...');
     } else {
       console.log('ProtectedRoute: Auth state loaded', {
         isAuthenticated,
         isAdmin,
         userId: user?.id,
         profileId: profile?.id,
-        role: profile?.role
+        role: profile?.role,
+        hasSession: !!session
       });
       
       if (!isAuthenticated) {
@@ -33,7 +33,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
         console.log('ProtectedRoute: Admin access required but user is not admin, will redirect to /subjects');
       }
     }
-  }, [isLoading, isAuthenticated, isAdmin, requireAdmin, user, profile]);
+  }, [isLoading, isAuthenticated, isAdmin, requireAdmin, user, profile, session]);
 
   // Show loading UI while checking authentication
   if (isLoading) {

@@ -2,29 +2,36 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile } from '@/integrations/supabase/database.types';
+import { User, Session } from '@supabase/supabase-js';
 
 type AuthContextType = {
-  user: any | null;
+  user: User | null;
+  session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isStaff: boolean;
+  error: Error | null;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  session: null,
   profile: null,
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
   isStaff: false,
+  error: null,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   // Function to fetch user profile
   const fetchUserProfile = async (userId: string) => {
@@ -38,6 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('Error fetching profile:', error);
+        setError(error);
         return null;
       }
 
@@ -45,36 +53,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return data;
     } catch (error) {
       console.error('Exception when fetching profile:', error);
+      setError(error instanceof Error ? error : new Error('Unknown error fetching profile'));
       return null;
     }
   };
 
   useEffect(() => {
-    // First, check if there's an existing session
-    const initAuth = async () => {
-      setIsLoading(true);
-      
-      try {
-        // Get session
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Initial session check:', session ? 'Session exists' : 'No session');
+    // Set up auth state listener FIRST to catch any auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log('Auth state changed:', event, currentSession ? 'Session exists' : 'No session');
         
-        if (session?.user) {
-          // We found a session, set the user
-          setUser(session.user);
-          
-          // Fetch the profile
-          const profileData = await fetchUserProfile(session.user.id);
-          setProfile(profileData);
-        } else {
-          // No session found
+        // Always update our session state
+        setSession(currentSession);
+        
+        if (event === 'SIGNED_OUT' || !currentSession) {
           setUser(null);
           setProfile(null);
+          setIsLoading(false);
+          return;
         }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        setUser(null);
-        setProfile(null);
+        
+        if (currentSession?.user) {
+          setUser(currentSession.user);
+          
+          // Don't set loading to true if we're just refreshing the token
+          if (event !== 'TOKEN_REFRESHED') {
+            setIsLoading(true);
+          }
+          
+          // Fetch profile
+          const profileData = await fetchUserProfile(currentSession.user.id);
+          setProfile(profileData);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // THEN check for existing session
+    const initAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        console.log('Initial session check:', initialSession ? 'Session exists' : 'No session');
+        
+        if (initialSession?.user) {
+          setUser(initialSession.user);
+          setSession(initialSession);
+          
+          console.log('Getting current user profile');
+          const profileData = await fetchUserProfile(initialSession.user.id);
+          setProfile(profileData);
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error initializing auth'));
       } finally {
         setIsLoading(false);
       }
@@ -82,64 +115,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initAuth();
 
-    // Set up auth change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
-        
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setIsLoading(false);
-          return;
-        }
-        
-        if (session?.user) {
-          setUser(session.user);
-          
-          // Don't set loading to true if we're just refreshing the session
-          if (event !== 'TOKEN_REFRESHED') {
-            setIsLoading(true);
-          }
-          
-          // Fetch profile
-          const profileData = await fetchUserProfile(session.user.id);
-          setProfile(profileData);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        
-        setIsLoading(false);
-      }
-    );
-
     // Cleanup
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Auth state updated:', {
-      user: user?.id,
-      profile: profile?.id,
-      isLoading,
-      isAuthenticated: !!user,
-      isAdmin: profile?.role === 'admin',
-      isStaff: profile?.role === 'staff' || profile?.role === 'admin',
-    });
-  }, [user, profile, isLoading]);
-
   // Prepare context value
   const value = {
     user,
+    session,
     profile,
     isLoading,
     isAuthenticated: !!user,
     isAdmin: profile?.role === 'admin',
     isStaff: profile?.role === 'staff' || profile?.role === 'admin',
+    error,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

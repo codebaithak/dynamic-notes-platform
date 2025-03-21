@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +18,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder = 'Write your content here...'
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [editorValue, setEditorValue] = useState('');
   const { toast } = useToast();
+
+  // Sync the external value with the internal state
+  useEffect(() => {
+    setEditorValue(value);
+  }, [value]);
+
+  // Handle editor changes
+  const handleChange = (newContent: string) => {
+    setEditorValue(newContent);
+    onChange(newContent);
+  };
 
   const handleImageUpload = async () => {
     const input = document.createElement('input');
@@ -47,17 +59,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           .from('lesson-images')
           .getPublicUrl(fileName);
           
-        // Insert the image into the editor
-        const editor = document.querySelector('.ql-editor');
-        const range = window.getSelection()?.getRangeAt(0);
+        // Get the Quill editor instance
+        const quill = (document.querySelector('.ql-editor') as any)?.getEditor();
         
-        if (editor && range) {
-          const img = document.createElement('img');
-          img.src = publicUrl;
-          img.alt = 'Uploaded image';
-          img.style.maxWidth = '100%';
-          
-          range.insertNode(img);
+        // Insert the image at the current selection point
+        if (quill) {
+          const range = quill.getSelection(true);
+          quill.insertEmbed(range.index, 'image', publicUrl);
+          // Move cursor after image
+          quill.setSelection(range.index + 1);
         }
         
         toast({
@@ -105,7 +115,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   ];
 
   return (
-    <div className="rich-text-editor">
+    <div className="rich-text-editor relative min-h-[200px]">
       {isUploading && (
         <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-2">
@@ -117,8 +127,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       
       <ReactQuill
         theme="snow"
-        value={value}
-        onChange={onChange}
+        value={editorValue}
+        onChange={handleChange}
         modules={modules}
         formats={formats}
         placeholder={placeholder}

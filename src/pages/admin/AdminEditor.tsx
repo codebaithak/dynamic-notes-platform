@@ -23,7 +23,7 @@ const AdminEditor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAdmin, isAuthenticated } = useAuth();
+  const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
   
   // State for form fields
   const [title, setTitle] = useState("");
@@ -32,12 +32,24 @@ const AdminEditor = () => {
   const [content, setContent] = useState("");
   const [lessonOrder, setLessonOrder] = useState(0);
   const [subjectId, setSubjectId] = useState("");
+  const [activeTab, setActiveTab] = useState("editor");
   
   // Validate parameters
-  if (!type || (type !== "subject" && type !== "lesson")) {
-    navigate("/admin", { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (!type || (type !== "subject" && type !== "lesson")) {
+      navigate("/admin", { replace: true });
+    }
+  }, [type, navigate]);
+
+  // Get subject ID from URL if present
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const subjectIdFromUrl = urlParams.get("subjectId");
+    
+    if (isNew && type === "lesson" && subjectIdFromUrl) {
+      setSubjectId(subjectIdFromUrl);
+    }
+  }, [isNew, type]);
 
   // If not new, fetch existing data
   const fetchData = async () => {
@@ -50,10 +62,10 @@ const AdminEditor = () => {
     }
   };
   
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading: dataLoading, error: dataError } = useQuery({
     queryKey: [type, id],
     queryFn: fetchData,
-    enabled: !isNew && !!id && isAuthenticated,
+    enabled: !isNew && !!id && isAuthenticated && !authLoading,
     meta: {
       onError: (error: Error) => {
         console.error("Error loading data:", error);
@@ -78,7 +90,7 @@ const AdminEditor = () => {
   
   // Load data into form fields when available
   useEffect(() => {
-    if (data && !isLoading) {
+    if (data && !dataLoading) {
       console.log("Data loaded:", data);
       if (type === "subject" && isSubject(data)) {
         setTitle(data.title);
@@ -91,17 +103,7 @@ const AdminEditor = () => {
         setLessonOrder(data.lesson_order);
       }
     }
-  }, [data, isLoading, type]);
-  
-  // Get subject ID from URL if present
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const subjectIdFromUrl = urlParams.get("subjectId");
-    
-    if (isNew && type === "lesson" && subjectIdFromUrl) {
-      setSubjectId(subjectIdFromUrl);
-    }
-  }, [isNew, type]);
+  }, [data, dataLoading, type]);
   
   // Save mutations
   const subjectMutation = useMutation({
@@ -205,6 +207,26 @@ const AdminEditor = () => {
     }
   };
   
+  // Handle preview tab click to sync content
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+  
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p>Checking authentication...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -216,6 +238,10 @@ const AdminEditor = () => {
         </Card>
       </div>
     );
+  }
+  
+  if (!type || (type !== "subject" && type !== "lesson")) {
+    return null; // Will redirect via the useEffect
   }
   
   return (
@@ -230,7 +256,7 @@ const AdminEditor = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isLoading ? (
+          {dataLoading && !isNew ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
@@ -276,7 +302,7 @@ const AdminEditor = () => {
                 </>
               ) : (
                 <>
-                  <Tabs defaultValue="editor" className="w-full">
+                  <Tabs defaultValue="editor" className="w-full" onValueChange={handleTabChange}>
                     <TabsList className="mb-4">
                       <TabsTrigger value="editor">Editor</TabsTrigger>
                       <TabsTrigger value="preview">Preview</TabsTrigger>
@@ -286,7 +312,7 @@ const AdminEditor = () => {
                         <label htmlFor="content" className="text-sm font-medium">
                           Lesson Content
                         </label>
-                        <div className="min-h-[400px] border rounded-md">
+                        <div className="min-h-[400px] border rounded-md relative">
                           <RichTextEditor 
                             value={content}
                             onChange={setContent}
@@ -335,7 +361,7 @@ const AdminEditor = () => {
             disabled={
               subjectMutation.isPending ||
               lessonMutation.isPending ||
-              isLoading
+              dataLoading
             }
           >
             {subjectMutation.isPending || lessonMutation.isPending ? (
