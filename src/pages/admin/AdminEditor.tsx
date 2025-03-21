@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getSubjectById, getLessonById, createSubject, updateSubject, createLesson, updateLesson } from "@/api";
+import { getSubjectById, getLessonById, createSubject, updateSubject, createLesson, updateLesson, getNextLessonOrder } from "@/api";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SubjectWithProgress, Lesson } from "@/integrations/supabase/database.types";
@@ -33,6 +33,7 @@ const AdminEditor = () => {
   const [lessonOrder, setLessonOrder] = useState(0);
   const [subjectId, setSubjectId] = useState("");
   const [activeTab, setActiveTab] = useState("editor");
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Validate parameters
   useEffect(() => {
@@ -48,6 +49,21 @@ const AdminEditor = () => {
     
     if (isNew && type === "lesson" && subjectIdFromUrl) {
       setSubjectId(subjectIdFromUrl);
+      
+      // Get next lesson order when creating a new lesson
+      const fetchNextOrder = async () => {
+        if (subjectIdFromUrl) {
+          try {
+            const nextOrder = await getNextLessonOrder(subjectIdFromUrl);
+            setLessonOrder(nextOrder);
+          } catch (error) {
+            console.error("Error getting next lesson order:", error);
+            setLessonOrder(1); // Fallback to 1 if error occurs
+          }
+        }
+      };
+      
+      fetchNextOrder();
     }
   }, [isNew, type]);
 
@@ -90,20 +106,22 @@ const AdminEditor = () => {
   
   // Load data into form fields when available
   useEffect(() => {
-    if (data && !dataLoading) {
+    if (data && !dataLoading && !isInitialized) {
       console.log("Data loaded:", data);
       if (type === "subject" && isSubject(data)) {
-        setTitle(data.title);
-        setDescription(data.description);
+        setTitle(data.title || "");
+        setDescription(data.description || "");
         setImage(data.image || "");
+        setIsInitialized(true);
       } else if (type === "lesson" && isLesson(data)) {
-        setTitle(data.title);
-        setContent(data.content);
-        setSubjectId(data.subject_id);
-        setLessonOrder(data.lesson_order);
+        setTitle(data.title || "");
+        setContent(data.content || "");
+        setSubjectId(data.subject_id || "");
+        setLessonOrder(data.lesson_order || 0);
+        setIsInitialized(true);
       }
     }
-  }, [data, dataLoading, type]);
+  }, [data, dataLoading, type, isInitialized]);
   
   // Save mutations
   const subjectMutation = useMutation({
@@ -205,6 +223,11 @@ const AdminEditor = () => {
         lesson_order: lessonOrder,
       });
     }
+  };
+  
+  // Handle content update
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
   };
   
   // Handle preview tab click to sync content
@@ -315,7 +338,7 @@ const AdminEditor = () => {
                         <div className="min-h-[400px] border rounded-md relative">
                           <RichTextEditor 
                             value={content}
-                            onChange={setContent}
+                            onChange={handleContentChange}
                             placeholder="Enter lesson content (rich text and markdown supported)"
                           />
                         </div>

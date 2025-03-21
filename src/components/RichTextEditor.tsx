@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,10 +20,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [editorValue, setEditorValue] = useState('');
   const { toast } = useToast();
+  const quillRef = useRef<ReactQuill>(null);
 
   // Sync the external value with the internal state
   useEffect(() => {
-    setEditorValue(value);
+    if (value !== editorValue) {
+      setEditorValue(value);
+    }
   }, [value]);
 
   // Handle editor changes
@@ -60,7 +63,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           .getPublicUrl(fileName);
           
         // Get the Quill editor instance
-        const quill = (document.querySelector('.ql-editor') as any)?.getEditor();
+        const quill = quillRef.current?.getEditor();
         
         // Insert the image at the current selection point
         if (quill) {
@@ -126,6 +129,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       )}
       
       <ReactQuill
+        ref={quillRef}
         theme="snow"
         value={editorValue}
         onChange={handleChange}

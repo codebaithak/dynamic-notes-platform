@@ -189,14 +189,43 @@ export const getLessonById = async (id: string): Promise<Lesson | null> => {
   return data;
 };
 
+export const getNextLessonOrder = async (subjectId: string): Promise<number> => {
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('lesson_order')
+    .eq('subject_id', subjectId)
+    .order('lesson_order', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Error getting next lesson order:', error);
+    throw error;
+  }
+
+  // If no lessons exist yet, start with order 1
+  if (!data || data.length === 0) {
+    return 1;
+  }
+
+  // Otherwise, increment the highest current order
+  return data[0].lesson_order + 1;
+};
+
 export const createLesson = async (lesson: Omit<Lesson, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<Lesson> => {
   const { data: { session } } = await supabase.auth.getSession();
+  
+  // Ensure lesson has an order, get next order if not provided
+  const lessonWithOrder = { ...lesson };
+  
+  if (!lessonWithOrder.lesson_order) {
+    lessonWithOrder.lesson_order = await getNextLessonOrder(lessonWithOrder.subject_id);
+  }
   
   const { data, error } = await supabase
     .from('lessons')
     .insert([
       { 
-        ...lesson, 
+        ...lessonWithOrder, 
         created_by: session?.user?.id
       }
     ])

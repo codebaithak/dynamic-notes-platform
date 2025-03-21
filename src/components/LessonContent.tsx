@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -10,8 +11,12 @@ interface LessonContentProps {
 }
 
 const LessonContent: React.FC<LessonContentProps> = ({ content }) => {
+  if (!content) {
+    return null;
+  }
+
   // If content appears to be HTML (from rich text editor)
-  if (content && (content.includes('<p>') || content.includes('<h1>') || content.includes('<div>'))) {
+  if (content.includes('<p>') || content.includes('<h1>') || content.includes('<div>') || content.includes('<img')) {
     return (
       <div 
         className="lesson-content prose dark:prose-invert max-w-none"
