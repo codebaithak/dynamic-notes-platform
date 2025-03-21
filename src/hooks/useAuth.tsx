@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Function to fetch user profile
   const fetchUserProfile = async (userId: string) => {
@@ -59,65 +60,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST to catch any auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.log('Auth state changed:', event, currentSession ? 'Session exists' : 'No session');
-        
-        // Always update our session state
-        setSession(currentSession);
-        
-        if (event === 'SIGNED_OUT' || !currentSession) {
+    let authSubscription: { unsubscribe: () => void } | null = null;
+    
+    // Combined function to handle auth state changes
+    const handleAuthChange = async (currentSession: Session | null) => {
+      try {
+        if (!currentSession?.user) {
+          // User is not authenticated
           setUser(null);
+          setSession(null);
           setProfile(null);
           setIsLoading(false);
           return;
         }
         
-        if (currentSession?.user) {
-          setUser(currentSession.user);
-          
-          // Don't set loading to true if we're just refreshing the token
-          if (event !== 'TOKEN_REFRESHED') {
-            setIsLoading(true);
-          }
-          
-          // Fetch profile
-          const profileData = await fetchUserProfile(currentSession.user.id);
-          setProfile(profileData);
-        }
+        // User is authenticated, update state
+        setUser(currentSession.user);
+        setSession(currentSession);
         
-        setIsLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    const initAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        console.log('Initial session check:', initialSession ? 'Session exists' : 'No session');
-        
-        if (initialSession?.user) {
-          setUser(initialSession.user);
-          setSession(initialSession);
-          
-          console.log('Getting current user profile');
-          const profileData = await fetchUserProfile(initialSession.user.id);
-          setProfile(profileData);
-        }
+        // Fetch profile data
+        const profileData = await fetchUserProfile(currentSession.user.id);
+        setProfile(profileData);
       } catch (err) {
-        console.error('Error initializing auth:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error initializing auth'));
+        console.error('Error handling auth change:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error handling auth change'));
       } finally {
         setIsLoading(false);
       }
     };
 
-    initAuth();
+    const initializeAuth = async () => {
+      try {
+        setIsLoading(true);
+        
+        // First, check for an existing session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        console.log('Initial auth check:', initialSession ? 'Session exists' : 'No session');
+        
+        // Handle initial session state
+        await handleAuthChange(initialSession);
+        
+        // Then set up listener for future auth changes
+        authSubscription = supabase.auth.onAuthStateChange(async (event, changedSession) => {
+          console.log('Auth state changed:', event);
+          await handleAuthChange(changedSession);
+        });
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error initializing auth'));
+        setIsLoading(false);
+      } finally {
+        setAuthInitialized(true);
+      }
+    };
 
-    // Cleanup
+    initializeAuth();
+
+    // Cleanup subscription on unmount
     return () => {
-      subscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
   }, []);
 
@@ -126,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     session,
     profile,
-    isLoading,
+    isLoading: isLoading && !authInitialized, // Only show loading if auth is not initialized
     isAuthenticated: !!user,
     isAdmin: profile?.role === 'admin',
     isStaff: profile?.role === 'staff' || profile?.role === 'admin',

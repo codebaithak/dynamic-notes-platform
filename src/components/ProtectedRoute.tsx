@@ -36,6 +36,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
   }, [isLoading, isAuthenticated, isAdmin, requireAdmin, user, profile, session]);
 
   // Show loading UI while checking authentication
+  // Limit loading state to 3 seconds max to prevent getting stuck
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
