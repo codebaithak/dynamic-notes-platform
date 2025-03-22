@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 interface RichTextEditorProps {
   value: string;
@@ -21,6 +22,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [editorValue, setEditorValue] = useState('');
   const { toast } = useToast();
   const quillRef = useRef<ReactQuill>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync the external value with the internal state
   useEffect(() => {
@@ -91,6 +93,52 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   };
 
+  // Handle Markdown file upload
+  const handleMarkdownUpload = async () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const processMarkdownFile = async (file: File) => {
+    setIsUploading(true);
+    
+    try {
+      const text = await file.text();
+      
+      // Set the markdown content directly to the editor
+      setEditorValue(text);
+      onChange(text);
+      
+      toast({
+        title: "Success",
+        description: "Markdown file loaded successfully",
+      });
+    } catch (error: any) {
+      console.error('Error reading markdown file:', error);
+      toast({
+        title: "Error",
+        description: `Failed to read markdown file: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    processMarkdownFile(file);
+    
+    // Reset the input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Custom toolbar options
   const modules = {
     toolbar: {
@@ -124,10 +172,34 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium">Uploading image...</p>
+            <p className="text-sm font-medium">Processing content...</p>
           </div>
         </div>
       )}
+      
+      <div className="mb-4 flex items-center gap-2">
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm" 
+          onClick={handleMarkdownUpload}
+          className="flex items-center gap-2"
+        >
+          <FileUp className="h-4 w-4" />
+          Upload Markdown
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          Upload a README.md file or any markdown file
+        </span>
+      </div>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".md,.markdown,.txt"
+        onChange={handleFileChange}
+        className="hidden"
+      />
       
       <ReactQuill
         ref={quillRef}

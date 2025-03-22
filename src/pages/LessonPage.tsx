@@ -208,7 +208,12 @@ const LessonPage = () => {
 
             <Card className="mb-8">
               <CardContent className="p-6">
-                <LessonContent content={lesson.content} />
+                <LessonContent 
+                  content={lesson.content} 
+                  previousUrl={prevLesson ? `/subject/${subject.id}/lesson/${prevLesson.id}` : undefined}
+                  nextUrl={nextLesson ? `/subject/${subject.id}/lesson/${nextLesson.id}` : undefined}
+                  homeUrl={`/subject/${subject.id}`}
+                />
               </CardContent>
             </Card>
 
