@@ -60,8 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    let authSubscription: { unsubscribe: () => void } | null = null;
-    
     // Combined function to handle auth state changes
     const handleAuthChange = async (currentSession: Session | null) => {
       try {
@@ -101,26 +99,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await handleAuthChange(initialSession);
         
         // Then set up listener for future auth changes
-        authSubscription = supabase.auth.onAuthStateChange(async (event, changedSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, changedSession) => {
           console.log('Auth state changed:', event);
           await handleAuthChange(changedSession);
         });
+        
+        // Store subscription for cleanup
+        return subscription;
       } catch (err) {
         console.error('Error initializing auth:', err);
         setError(err instanceof Error ? err : new Error('Unknown error initializing auth'));
         setIsLoading(false);
+        return null;
       } finally {
         setAuthInitialized(true);
       }
     };
 
-    initializeAuth();
-
+    // Initialize auth and store subscription
+    const subscriptionPromise = initializeAuth();
+    
     // Cleanup subscription on unmount
     return () => {
-      if (authSubscription) {
-        authSubscription.unsubscribe();
-      }
+      subscriptionPromise.then(subscription => {
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+      });
     };
   }, []);
 
